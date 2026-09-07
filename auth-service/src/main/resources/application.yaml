@@ -1,0 +1,62 @@
+# spring:
+#   application:
+#     name: auth-service
+
+#   datasource:
+#     url: jdbc:sqlserver://localhost:1434;databaseName=auth_db;encrypt=false;trustServerCertificate=true
+#     username: sa
+#     password: YourStrongPassword123!
+#     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+#   flyway:
+#     enabled: true
+#     locations: classpath:/db/migration
+
+#   jpa:
+#     hibernate:
+#       ddl-auto: validate
+
+#   data:
+#     redis:
+#       host: localhost
+#       port: 6380
+
+
+# jwt:
+#   secret: OvWJI/jl7nBiUQqcBwRM6GtPXJjDFd5azFsC+nvJ4fM=
+#   access-token-expiration: 900000
+#   refresh-token-expiration: 604800000
+
+# server:
+#   port: 8081
+
+
+spring:
+  application:
+    name: auth-service
+
+  datasource:
+    url: ${DB_URL:jdbc:sqlserver://localhost:1434;databaseName=auth_db;encrypt=false;trustServerCertificate=true}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+server:
+  port: 8081
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 900000
+  refresh-token-expiration: 604800000
