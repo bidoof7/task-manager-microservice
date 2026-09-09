@@ -7,5 +7,9 @@ public record TaskUpdatedEvent(
         Long taskId,
         String title,
         String createdBy
-) {
+) implements TaskEvent {
+    @Override
+    public String eventType() {
+        return "TaskUpdated";
+    }
 }

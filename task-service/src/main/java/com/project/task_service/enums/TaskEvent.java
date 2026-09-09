@@ -2,7 +2,8 @@ package com.project.task_service.enums;
 
 public enum TaskEvent {
     TASK_CREATED("TaskCreated"),
-    TASK_UPDATED("TaskUpdated");
+    TASK_UPDATED("TaskUpdated"),
+    TASK_DELETED("TaskDeleted");
 
     private final String taskStatus;
 

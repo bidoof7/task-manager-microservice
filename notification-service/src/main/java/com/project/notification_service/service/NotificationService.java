@@ -1,72 +1,39 @@
 package com.project.notification_service.service;
 
-import com.project.notification_service.entity.ProcessedEvent;
-import com.project.notification_service.event.TaskCreatedEvent;
-import com.project.notification_service.event.TaskUpdatedEvent;
-import com.project.notification_service.exception.DuplicateEventException;
-import com.project.notification_service.repository.ProcessedEventRepository;
+import com.project.notification_service.event.TaskEvent;
+import com.project.notification_service.handlers.EventHandlerRegistry;
+import com.project.notification_service.handlers.TaskEventHandler;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
-    private final ProcessedEventRepository processedEventRepository;
+    private final EventProcessService eventProcessService;
+    private final EventHandlerRegistry eventHandlerRegistry;
 
     @Transactional
-    public void processTaskCreated(TaskCreatedEvent event) {
-        if(processedEventRepository.existsById(event.eventId())){
-            log.info(
-                    "Event already processed: eventId={}",
-                    event.eventId()
-            );
+    public void process(TaskEvent event) {
+        if (eventProcessService.alreadyProcessed(event)) {
+            log.info("Event already processed at: eventId={}",
+                    event.eventId());
             return;
         }
 
         log.info(
                 "Processing TaskCreated: taskId={}, title={}, createdBy={}",
                 event.taskId(),
-                event.title(),
-                event.createdBy()
+                event.eventId(),
+                event.eventType()
         );
 
-        ProcessedEvent processedEvent = new ProcessedEvent();
+        TaskEventHandler handler = eventHandlerRegistry.getHandler(event.eventType());
 
-        processedEvent.setEventId(event.eventId());
-        processedEvent.setEventType("TaskCreated");
-        processedEvent.setProcessedAt(LocalDateTime.now());
+        handler.handle(event);
 
-        processedEventRepository.save(processedEvent);
-    }
-
-    @Transactional
-    public void processTaskUpdated(TaskUpdatedEvent event) {
-        if(processedEventRepository.existsById(event.eventId())){
-            log.info(
-                    "Event already processed: eventId={}",
-                    event.eventId()
-            );
-            return;
-        }
-
-        log.info(
-                "Processing TaskUpdated: taskId={}, title={}, createdBy={}",
-                event.taskId(),
-                event.title(),
-                event.createdBy()
-        );
-
-        ProcessedEvent processedEvent = new ProcessedEvent();
-
-        processedEvent.setEventId(event.eventId());
-        processedEvent.setEventType("TaskUpdated");
-        processedEvent.setProcessedAt(LocalDateTime.now());
-
-        processedEventRepository.save(processedEvent);
+        eventProcessService.markAsProcessed(event);
     }
 }

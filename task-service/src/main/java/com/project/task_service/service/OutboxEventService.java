@@ -5,6 +5,7 @@ import com.project.task_service.entity.Task;
 import com.project.task_service.enums.OutboxStatus;
 import com.project.task_service.enums.TaskEvent;
 import com.project.task_service.event.TaskCreatedEvent;
+import com.project.task_service.event.TaskDeletedEvent;
 import com.project.task_service.event.TaskUpdatedEvent;
 import com.project.task_service.repository.OutboxEventRepository;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +47,6 @@ public class OutboxEventService {
             outboxEvent.setCreatedAt(LocalDateTime.now());
 
             outboxEventRepository.save(outboxEvent);
-
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Cannot serialize TaskCreatedEvent", e);
         }
@@ -79,7 +79,37 @@ public class OutboxEventService {
 
             outboxEventRepository.save(outboxEvent);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException("Cannot serialize TaskCreatedEvent", e);
+            throw new RuntimeException("Cannot serialize TaskUpdatedEvent", e);
+        }
+    }
+
+    public void saveTaskDeletedEvent(Task task) {
+        try {
+            UUID eventId = UUID.randomUUID();
+            String eventType = TaskEvent.TASK_DELETED.getTaskStatus();
+
+            TaskDeletedEvent event = new TaskDeletedEvent(
+                    eventId,
+                    eventType,
+                    task.getId(),
+                    task.getTitle()
+            );
+
+            String payload = objectMapper.writeValueAsString(event);
+
+            OutboxEvent outboxEvent = new OutboxEvent();
+
+            outboxEvent.setAggregateType("Task");
+            outboxEvent.setAggregateId(task.getId().toString());
+            outboxEvent.setEventId(eventId);
+            outboxEvent.setEventType(eventType);
+            outboxEvent.setPayload(payload);
+            outboxEvent.setStatus(OutboxStatus.PENDING);
+            outboxEvent.setCreatedAt(LocalDateTime.now());
+
+            outboxEventRepository.save(outboxEvent);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Cannot serialize TaskDeletedEvent", e);
         }
     }
 }

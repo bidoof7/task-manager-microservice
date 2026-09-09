@@ -1,22 +1,19 @@
 package com.project.notification_service.kafka;
 
-import com.project.notification_service.event.TaskCreatedEvent;
-import com.project.notification_service.event.TaskUpdatedEvent;
+import com.project.notification_service.event.TaskEvent;
 import com.project.notification_service.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TaskEventConsumer {
-    private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
+    private final TaskEventDesirialize taskEventDesirialize;
 
     @KafkaListener(topics = "task-events", groupId = "notification-service", concurrency = "3")
     public void consume(String message, ConsumerRecord<String, String> record) {
@@ -29,31 +26,13 @@ public class TaskEventConsumer {
         );
 
         try {
-            JsonNode root = objectMapper.readTree(message);
-            // DEBUG
-            log.info("Kafka msg: {}", root);
-            String eventType = root.get("eventType").asString();
+            TaskEvent event = taskEventDesirialize.desirialize(message);
 
-            switch (eventType) {
-                case "TaskCreated" -> {
-                    TaskCreatedEvent event = objectMapper.treeToValue(root, TaskCreatedEvent.class);
-                    notificationService.processTaskCreated(event);
-                }
-                case "TaskUpdated" -> {
-                    TaskUpdatedEvent event = objectMapper.treeToValue(root, TaskUpdatedEvent.class);
-                    notificationService.processTaskUpdated(event);
-                }
-                default -> {
-                    log.warn(
-                            "Unknown event type: {}",
-                            eventType
-                    );
-                }
-            }
+            notificationService.process(event);
 
             log.info(
                     "Kafka message processed successfully: eventType={}, partition={}, offset={}",
-                    eventType,
+                    event.eventType(),
                     record.partition(),
                     record.offset()
             );
@@ -67,4 +46,6 @@ public class TaskEventConsumer {
             throw new RuntimeException(e);
         }
     }
+
+
 }

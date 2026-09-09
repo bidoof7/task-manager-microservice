@@ -2,29 +2,25 @@ package com.project.task_service.service;
 
 import com.project.task_service.entity.Task;
 import com.project.task_service.dto.TaskRequest;
-import com.project.task_service.event.TaskCreatedEvent;
 import com.project.task_service.exception.TaskNotFound;
 import com.project.task_service.repository.TaskRepository;
+import com.project.task_service.utils.SecurityUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-//import org.springframework.security.access.AccessDeniedException;
-//import org.springframework.security.access.prepost.PreAuthorize;
-//import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.context.ApplicationEventPublisher;
+
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
 public class TaskService {
     private final TaskRepository taskRepository;
     private final OutboxEventService outboxEventService;
+    private final SecurityUtils securityUtils;
 
     @PreAuthorize("hasAuthority('TASK_READ')")
     public List<Task> findAll() {
@@ -64,17 +60,8 @@ public class TaskService {
     public Task update(Long id, TaskRequest request) {
         Task task = taskRepository.findById(id).orElseThrow(() -> new TaskNotFound("TASK ID " + id + " NOT EXIST"));
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        assert authentication != null;
-        String username = authentication.getName();
-
-        boolean isAdmin = authentication
-                .getAuthorities()
-                .stream()
-                .anyMatch(
-                        authority -> Objects.equals(authority.getAuthority(), "ROLE_ADMIN")
-                );
+        String username = securityUtils.getCurrentUsername();
+        boolean isAdmin = securityUtils.isAdmin();
 
         if (!isAdmin && !task.getCreatedBy().equals(username)) {
             throw new AccessDeniedException("USER IS NOT AVAILABLE TO UPDATE THIS TASK");
@@ -90,16 +77,20 @@ public class TaskService {
         return updatedTask;
     }
 
-//    @PreAuthorize("hasAuthority('TASK_DELETE')")
-//    public void delete(Long id)  {
-//        String username = Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getName();
-//
-//        Task task = _taskRepository.findById(id).orElseThrow(() -> new TaskNotFound("TASK ID " + id + " NOT EXIST"));
-//
-//        if(!task.getCreatedBy().equals(username)) {
-//            throw new AccessDeniedException("DONT HAVE PERMISSION");
-//        }
-//
-//        _taskRepository.deleteById(id);
-//    }
+    @PreAuthorize("hasAuthority('TASK_DELETE')")
+    @Transactional
+    public void delete(Long id)  {
+        Task task = taskRepository.findById(id).orElseThrow(() -> new TaskNotFound("TASK ID " + id + " NOT EXIST"));
+
+        String username = securityUtils.getCurrentUsername();
+        boolean isAdmin = securityUtils.isAdmin();
+
+        if (!isAdmin && !task.getCreatedBy().equals(username)) {
+            throw new AccessDeniedException("USER IS NOT AVAILABLE TO UPDATE THIS TASK");
+        }
+
+        outboxEventService.saveTaskDeletedEvent(task);
+
+        taskRepository.deleteById(id);
+    }
 }
