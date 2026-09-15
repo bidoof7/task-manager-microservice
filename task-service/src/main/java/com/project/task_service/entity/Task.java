@@ -26,6 +26,10 @@ public class Task {
     @Column(nullable = false)
     private String description;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "group_id", nullable = false)
+    private TaskGroup groupId;
+
     @CreatedBy
     @Column(name = "created_by", updatable = false)
     private String createdBy;

@@ -24,7 +24,7 @@ public class NotificationService {
         }
 
         log.info(
-                "Processing TaskCreated: taskId={}, title={}, createdBy={}",
+                "Processing notification: taskId={}, title={}, createdBy={}",
                 event.taskId(),
                 event.eventId(),
                 event.eventType()

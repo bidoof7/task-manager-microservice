@@ -26,8 +26,6 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> {
-                })
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/error", "/v3/api-docs/**", "/swagger-ui/**", "/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

@@ -1,5 +1,6 @@
 package com.project.task_service.controller;
 
+import com.project.task_service.dto.PageResponse;
 import com.project.task_service.dto.Response;
 import com.project.task_service.dto.TaskRequest;
 import com.project.task_service.entity.Task;
@@ -8,6 +9,9 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,8 +29,30 @@ public class TaskController {
     private final TaskService taskService;
 
     @GetMapping
-    public ResponseEntity<Response<List<Task>>> findAll() {
-        return ResponseEntity.ok(new Response<>(true, "ALL TASKS", taskService.findAll()));
+    public ResponseEntity<Response<PageResponse<Task>>> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int pageSize
+    ) {
+        if (page < 0) {
+            throw new IllegalArgumentException("Page must be >= 0");
+        }
+
+        if (pageSize < 1 || pageSize > 100) {
+            throw new IllegalArgumentException("Page size must be between 1 and 100");
+        }
+
+        Pageable pageable = PageRequest.of(page,pageSize);
+        Page<Task> pageTask = taskService.findAll(pageable);
+
+        PageResponse<Task> result = new PageResponse<>(
+                pageTask.getContent(),
+                pageTask.getNumber(),
+                pageTask.getSize(),
+                pageTask.getTotalPages(),
+                pageTask.getTotalElements()
+        );
+
+        return ResponseEntity.ok(new Response<>(true, "ALL TASKS", result));
     }
 
     @GetMapping("/{id}")

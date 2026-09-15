@@ -1,7 +1,13 @@
 package com.project.task_service.exception;
 
 public class TaskNotFound extends RuntimeException{
-    public TaskNotFound(String message) {
-        super(message);
+    private final Long taskId;
+    public TaskNotFound(Long taskId) {
+        super("TASK ID " + taskId + " NOT EXIST");
+        this.taskId = taskId;
+    }
+
+    public Long getTaskId() {
+        return taskId;
     }
 }

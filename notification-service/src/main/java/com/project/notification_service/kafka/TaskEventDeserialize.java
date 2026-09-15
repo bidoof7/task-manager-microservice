@@ -1,10 +1,6 @@
 package com.project.notification_service.kafka;
 
-import com.project.notification_service.event.TaskCreatedEvent;
-import com.project.notification_service.event.TaskDeletedEvent;
-import com.project.notification_service.event.TaskEvent;
-import com.project.notification_service.event.TaskUpdatedEvent;
-import com.project.notification_service.handlers.EventHandlerRegistry;
+import com.project.notification_service.event.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -12,10 +8,10 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 @RequiredArgsConstructor
-public class TaskEventDesirialize {
+public class TaskEventDeserialize {
     private final ObjectMapper objectMapper;
 
-    public TaskEvent desirialize(String message) {
+    public TaskEvent deserialize(String message) {
         try {
             JsonNode root = objectMapper.readTree(message);
 
@@ -32,7 +28,7 @@ public class TaskEventDesirialize {
 
             };
         } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to desiralize", e);
+            throw new IllegalArgumentException("Failed to deserialize", e);
         }
     }
 }

@@ -165,7 +165,7 @@ services:
     container_name: task-task-service
 
     ports:
-      - "8002:8002"
+      - "8082:8082"
 
     environment:
       DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=task_db;encrypt=false;trustServerCertificate=true
@@ -199,7 +199,7 @@ services:
     container_name: task-notification-service
 
     ports:
-      - "8003:8003"
+      - "8083:8083"
 
     environment:
       DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=notification_db;encrypt=false;trustServerCertificate=true
@@ -235,7 +235,7 @@ services:
 
     environment:
       AUTH_SERVICE_URL: http://auth-service:8081
-      TASK_SERVICE_URL: http://task-service:8002
+      TASK_SERVICE_URL: http://task-service:8082
       JWT_SECRET: ${JWT_SECRET}
 
     depends_on:

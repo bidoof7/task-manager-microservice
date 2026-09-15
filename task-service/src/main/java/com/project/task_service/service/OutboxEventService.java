@@ -30,6 +30,7 @@ public class OutboxEventService {
                     eventId,
                     eventType,
                     task.getId(),
+                    task.getGroupId().getId(),
                     task.getTitle(),
                     task.getCreatedBy()
             );

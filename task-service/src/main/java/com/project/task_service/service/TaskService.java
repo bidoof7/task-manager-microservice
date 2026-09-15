@@ -2,12 +2,16 @@ package com.project.task_service.service;
 
 import com.project.task_service.entity.Task;
 import com.project.task_service.dto.TaskRequest;
+import com.project.task_service.entity.TaskGroup;
+import com.project.task_service.exception.TaskGroupNotFound;
 import com.project.task_service.exception.TaskNotFound;
 import com.project.task_service.repository.TaskRepository;
 import com.project.task_service.utils.SecurityUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 
@@ -19,23 +23,24 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TaskService {
     private final TaskRepository taskRepository;
+    private final TaskGroupService taskGroupService;
     private final OutboxEventService outboxEventService;
     private final SecurityUtils securityUtils;
 
     @PreAuthorize("hasAuthority('TASK_READ')")
-    public List<Task> findAll() {
-        return taskRepository.findAll();
+    public Page<Task> findAll(Pageable pageable) {
+        return taskRepository.findAll(pageable);
     }
 
     @PreAuthorize("hasAuthority('TASK_READ')")
     public Task findById(Long id) {
-        return taskRepository.findById(id).orElseThrow(() -> new TaskNotFound("TASK ID " + id + " NOT EXIST"));
+        return taskRepository.findById(id).orElseThrow(() -> new TaskNotFound(id));
     }
 
     @PreAuthorize("hasAuthority('TASK_READ')")
     public List<Task> searchByTitle(String title) {
         if (title.isEmpty()) {
-            throw new TaskNotFound("TITLE CAN NOT EMPTY");
+            throw new RuntimeException("TITLE CANT BE NULL");
         }
         return taskRepository.findByTitleContaining(title);
     }
@@ -43,10 +48,13 @@ public class TaskService {
     @PreAuthorize("hasAuthority('TASK_CREATE')")
     @Transactional
     public Task save(TaskRequest request) {
+        TaskGroup groupId = taskGroupService.findById(request.groupId());
+
         Task task = new Task();
 
         task.setTitle(request.title());
         task.setDescription(request.description());
+        task.setGroupId(groupId);
 
         Task savedTask = taskRepository.save(task);
 
@@ -58,7 +66,7 @@ public class TaskService {
     @PreAuthorize("hasAuthority('TASK_UPDATE')")
     @Transactional
     public Task update(Long id, TaskRequest request) {
-        Task task = taskRepository.findById(id).orElseThrow(() -> new TaskNotFound("TASK ID " + id + " NOT EXIST"));
+        Task task = taskRepository.findById(id).orElseThrow(() -> new TaskNotFound(id));
 
         String username = securityUtils.getCurrentUsername();
         boolean isAdmin = securityUtils.isAdmin();
@@ -80,7 +88,7 @@ public class TaskService {
     @PreAuthorize("hasAuthority('TASK_DELETE')")
     @Transactional
     public void delete(Long id)  {
-        Task task = taskRepository.findById(id).orElseThrow(() -> new TaskNotFound("TASK ID " + id + " NOT EXIST"));
+        Task task = taskRepository.findById(id).orElseThrow(() -> new TaskNotFound(id));
 
         String username = securityUtils.getCurrentUsername();
         boolean isAdmin = securityUtils.isAdmin();

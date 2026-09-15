@@ -12,8 +12,6 @@ import java.util.List;
 
 @Repository
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> {
-    List<OutboxEvent> findTop100ByStatusOrderByIdAsc(OutboxStatus status);
-
     /**
      * SQL explain:
      * UPDLOCK - Đọc nhưng row để chuẩn bị update

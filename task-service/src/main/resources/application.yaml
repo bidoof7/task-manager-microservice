@@ -1,32 +1,3 @@
-# spring:
-#   application:
-#     name: task-service
-
-#   # datasource:
-#   #   url: jdbc:sqlserver://localhost:1434;databaseName=task_db;encrypt=false;trustServerCertificate=true
-#   #   username: sa
-#   #   password: YourStrongPassword123!
-#   #   driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
-
-#   flyway:
-#     enabled: true
-#     locations: classpath:/db/migration
-
-#   jpa:
-#     hibernate:
-#       ddl-auto: validate
-
-#   kafka:
-#     consumer:
-#       enable-auto-commit: false
-#       auto-offset-reset: earliest
-
-# # jwt:
-# #   secret: OvWJI/jl7nBiUQqcBwRM6GtPXJjDFd5azFsC+nvJ4fM=
-
-# server:
-#   port: 8082
-
 spring:
   application:
     name: task-service
@@ -51,4 +22,4 @@ spring:
     secret: ${JWT_SECRET}
 
 server:
-  port: 8002
+  port: 8082

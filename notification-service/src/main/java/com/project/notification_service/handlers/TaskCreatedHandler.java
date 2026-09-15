@@ -18,8 +18,9 @@ public class TaskCreatedHandler implements TaskEventHandler{
         TaskCreatedEvent createdEvent = (TaskCreatedEvent) event;
 
         log.info(
-                "Handle TaskCreated: taskId={}, title={}, createdBy={}",
+                "Handle TaskCreated: taskId={}, groupId={}, title={}, createdBy={}",
                 createdEvent.taskId(),
+                createdEvent.groupId(),
                 createdEvent.title(),
                 createdEvent.createdBy()
         );

@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TaskEventConsumer {
     private final NotificationService notificationService;
-    private final TaskEventDesirialize taskEventDesirialize;
+    private final TaskEventDeserialize taskEventDeserialize;
 
     @KafkaListener(topics = "task-events", groupId = "notification-service", concurrency = "3")
     public void consume(String message, ConsumerRecord<String, String> record) {
@@ -26,7 +26,7 @@ public class TaskEventConsumer {
         );
 
         try {
-            TaskEvent event = taskEventDesirialize.desirialize(message);
+            TaskEvent event = taskEventDeserialize.deserialize(message);
 
             notificationService.process(event);
 
@@ -38,7 +38,7 @@ public class TaskEventConsumer {
             );
         } catch (Exception e) {
             log.error(
-                    "Failed to process TaskCreated event: {}",
+                    "Failed to process event: {}",
                     message,
                     e
             );

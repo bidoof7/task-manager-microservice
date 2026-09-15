@@ -6,6 +6,7 @@ public record TaskCreatedEvent(
         UUID eventId,
         String eventType,
         Long taskId,
+        Long groupId,
         String title,
         String createdBy
 ) {
