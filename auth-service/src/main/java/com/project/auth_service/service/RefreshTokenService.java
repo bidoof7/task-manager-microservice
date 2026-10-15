@@ -1,5 +1,6 @@
-package com.project.auth_service.security;
+package com.project.auth_service.service;
 
+import com.project.auth_service.exception.InvalidRefreshTokenException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -19,28 +20,28 @@ public class RefreshTokenService {
     private long refreshTokenExp;
 
     public String create(Long accountId) {
-        String token = UUID.randomUUID().toString();
+        String refreshToken = UUID.randomUUID().toString();
 
-        String key = PREFIX + token;
+        String key = PREFIX + refreshToken;
 
         redisTemplate.opsForValue().set(key, String.valueOf(accountId), Expiration.from(refreshTokenExp, TimeUnit.SECONDS));
 
-        return token;
+        return refreshToken;
     }
 
-    public Long getAccountId(String token) {
-        String key = PREFIX + token;
+    public Long getAccountId(String refreshToken) {
+        String key = PREFIX + refreshToken;
 
         String accountId = redisTemplate.opsForValue().get(key);
 
         if (accountId == null) {
-            throw new RuntimeException("REFRESH TOKEN INVALID OR EXPIRED");
+            throw new InvalidRefreshTokenException();
         }
 
         return Long.valueOf(accountId);
     }
 
-    public void revoke(String token) {
-        redisTemplate.delete(PREFIX + token);
+    public void revoke(String refreshToken) {
+        redisTemplate.delete(PREFIX + refreshToken);
     }
 }

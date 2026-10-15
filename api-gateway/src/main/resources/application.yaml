@@ -13,7 +13,14 @@ spring:
               uri: ${AUTH_SERVICE_URL:http://localhost:8081}
               predicates:
                 - Path=/api/v1/auth/**
-
+            - id: auth-oauth2-authorization
+              uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/oauth2/**
+            - id: auth-oauth2-callback
+              uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/login/oauth2/**
             - id: task-service
               uri: ${TASK_SERVICE_URL:http://localhost:8082}
               predicates:

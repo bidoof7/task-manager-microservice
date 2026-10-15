@@ -3,31 +3,44 @@ package com.project.auth_service.service;
 import com.project.auth_service.dto.*;
 import com.project.auth_service.entity.Account;
 import com.project.auth_service.entity.Role;
-import com.project.auth_service.exception.UsernameNotFound;
-import com.project.auth_service.jwt.JwtService;
+import com.project.auth_service.exception.EmailNotFound;
 import com.project.auth_service.repository.AccountRepository;
-import com.project.auth_service.security.CustomUserDetails;
-import com.project.auth_service.security.RefreshTokenService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class AccountService {
     private final AccountRepository accountRepository;
     private final AuthenticationManager authenticationManager;
+    private final AccountIdentityService accountIdentityService;
+    private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
-    private final RefreshTokenService refreshTokenService;
     private final RoleService roleService;
+    private final OutboxEventService outboxEventService;
 
-    public RegisterResponse register(RegisterRequest request) {
-        if (accountRepository.existsByUsername(request.username())) {
+    public AccountMeResponse getCurrentUser(Authentication authentication) {
+        String email = authentication.getName();
+
+        Account account = accountRepository.findByEmailWithPermissions(email).orElseThrow(() -> new EmailNotFound(email));
+
+        return new AccountMeResponse(
+                account.getId(),
+                account.getEmail(),
+                account.getRole().getRoleName()
+        );
+    }
+
+    @Transactional
+    public void register(RegisterRequest request) {
+        if (accountRepository.existsByEmail(request.email())) {
             throw new RuntimeException("USERNAME ALREADY EXISTS");
         }
 
@@ -38,48 +51,43 @@ public class AccountService {
         Role role = roleService.findByName("USER");
 
         Account account = new Account();
-        account.setUsername(request.username());
+        account.setEmail(request.email());
+        account.setEmailVerified(false);
         account.setPasswordHash(passwordEncoder.encode(request.password()));
         account.setRole(role);
         account.setStatus("ACTIVE");
 
         Account savedAccount = accountRepository.save(account);
 
-        return new RegisterResponse(savedAccount.getUsername());
+        outboxEventService.saveAccountCreatedEvent(savedAccount);
     }
 
-    public LoginResult login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.username(), request.password()));
+    public void login(LoginRequest request, HttpServletResponse response) {
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.email(), request.password()));
 
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        Account account = accountRepository
+                .findByEmailWithPermissions(request.email())
+                .orElseThrow(() -> new EmailNotFound(request.email()));
 
-        assert userDetails != null;
-        String accessToken = jwtService.generateToken(userDetails);
-
-        Account account = accountRepository.findByUsername(request.username()).orElseThrow(() -> new UsernameNotFound("USERNAME NOT FOUND"));
-
-        String refreshToken = refreshTokenService.create(account.getId());
-
-        return new LoginResult(accessToken, refreshToken);
+        tokenService.issueTokens(account, response);
     }
 
-    public LoginResult refresh(String oldToken) {
-        Long oldAccountId = refreshTokenService.getAccountId(oldToken);
+    @Transactional
+    public void loginWithGoogle(
+            OidcUser googleUser,
+            HttpServletResponse response
+    ) {
+        Account account = accountIdentityService.identityAccount(googleUser);
 
-        refreshTokenService.revoke(oldToken);
-
-        Account newAccount = accountRepository.findById(oldAccountId).orElseThrow(() -> new RuntimeException("ACCOUNT ID NOT FOUND"));
-
-        UserDetails userDetails = new CustomUserDetails(newAccount);
-
-        String accessToken = jwtService.generateToken(userDetails);
-
-        String refreshToken = refreshTokenService.create(newAccount.getId());
-
-        return new LoginResult(accessToken, refreshToken);
+        tokenService.issueTokens(account, response);
     }
 
-    public void logout(String token) {
-        refreshTokenService.revoke(token);
+    public void logout(String refreshToken, HttpServletResponse response) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            tokenService.revokeRefreshToken(refreshToken);
+        }
+
+        tokenService.clearCookie(response, "access_token", "/");
+        tokenService.clearCookie(response, "refresh_token", "/api/v1/auth/refresh");
     }
 }

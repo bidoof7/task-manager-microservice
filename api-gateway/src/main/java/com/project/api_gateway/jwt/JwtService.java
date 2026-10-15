@@ -20,13 +20,4 @@ public class JwtService {
     public Claims extractAllClaims(String token) {
         return Jwts.parser().verifyWith(secret).build().parseSignedClaims(token).getPayload();
     }
-
-    public boolean isTokenValid(String token) {
-        try {
-            Jwts.parser().verifyWith(secret).build().parseSignedClaims(token);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 }

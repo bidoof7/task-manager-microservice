@@ -1,7 +1,10 @@
 package com.project.api_gateway.jwt;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +12,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -24,42 +28,69 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        String authHeader = request.getHeader("Authorization");
+        String token = extractAccessToken(request);
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authHeader.substring(7);
+        try {
+            Claims claims = jwtService.extractAllClaims(token);
 
-        if (!jwtService.isTokenValid(token)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return;
+            String subject = claims.getSubject();
+
+            if (subject != null
+                    && SecurityContextHolder
+                    .getContext()
+                    .getAuthentication() == null) {
+
+                List<String> authorities =
+                        claims.get("authorities", List.class);
+
+                List<SimpleGrantedAuthority> grantedAuthorities =
+                        authorities == null
+                                ? List.of()
+                                : authorities.stream()
+                                .map(SimpleGrantedAuthority::new)
+                                .toList();
+
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                subject,
+                                null,
+                                grantedAuthorities
+                        );
+
+                authentication.setDetails(
+                        new WebAuthenticationDetailsSource()
+                                .buildDetails(request)
+                );
+
+                SecurityContextHolder
+                        .getContext()
+                        .setAuthentication(authentication);
+            }
+
+        } catch (JwtException e) {
+            // Invalid/expired JWT
         }
-
-        var claims = jwtService.extractAllClaims(token);
-
-        String subject = claims.getSubject();
-        String role = claims.get("role", String.class);
-        List<String> permissions = claims.get("permissions", List.class);
-
-        Set<GrantedAuthority> authoritySet = new HashSet<>();
-
-        authoritySet.add(new SimpleGrantedAuthority("ROLE_" + role));
-
-        if (permissions != null) {
-            permissions.forEach(permission -> authoritySet.add(new SimpleGrantedAuthority(permission)));
-        }
-
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                subject,
-                null,
-                authoritySet
-        );
-     
-        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
 
         filterChain.doFilter(request, response);
+    }
+
+    private String extractAccessToken(HttpServletRequest request) {
+
+        if (request.getCookies() == null) {
+            return null;
+        }
+
+        for (Cookie cookie : request.getCookies()) {
+            if ("access_token".equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+
+        return null;
     }
 }

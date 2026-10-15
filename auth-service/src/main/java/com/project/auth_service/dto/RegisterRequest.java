@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Size;
 
 public record RegisterRequest(
         @NotEmpty
-        String username,
+        String email,
 
         @NotEmpty
         @Size(min = 6, message = "Mật khẩu phải có ít nhất 6 kí tự")

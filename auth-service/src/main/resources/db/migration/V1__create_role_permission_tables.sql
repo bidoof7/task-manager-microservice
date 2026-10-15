@@ -10,18 +10,6 @@ CREATE TABLE permissions
     name VARCHAR(100) NOT NULL UNIQUE
 );
 
-CREATE TABLE accounts
-(
-    id       BIGINT IDENTITY(1,1) PRIMARY KEY,
-    username VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    status  VARCHAR(100)       NOT NULL,
-    role_id  BIGINT       NOT NULL,
-
-    CONSTRAINT fk_accounts_role
-        FOREIGN KEY (role_id)
-            REFERENCES roles (id)
-);
 
 CREATE TABLE role_permissions
 (

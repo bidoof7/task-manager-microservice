@@ -1,5 +1,4 @@
 services:
-
   # ========================================
   # SQL SERVER
   # ========================================
@@ -30,7 +29,6 @@ services:
       retries: 10
       start_period: 30s
     restart: unless-stopped
-
   # ========================================
   # SQL SERVER INIT DB
   # ========================================
@@ -59,7 +57,6 @@ services:
       - task-network
 
     restart: "no"
-
   # ========================================
   # REDIS
   # ========================================
@@ -79,8 +76,6 @@ services:
     restart: unless-stopped
 
     command: redis-server --appendonly yes
-
-
   # ========================================
   # KAFKA
   # ========================================
@@ -117,9 +112,17 @@ services:
 
     networks:
       - task-network
-
+    healthcheck:
+        test:
+          [
+            "CMD-SHELL",
+            "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"
+          ]
+        interval: 10s
+        timeout: 10s
+        retries: 10
+        start_period: 30s
     restart: unless-stopped
-
   # ========================================
   # AUTH SERVICE
   # ========================================
@@ -139,9 +142,11 @@ services:
 
       REDIS_HOST: redis
       REDIS_PORT: 6379
-
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_SECRET: ${JWT_SECRET}
 
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     depends_on:
       sqlserver-init:
         condition: service_completed_successfully
@@ -149,12 +154,12 @@ services:
       redis:
         condition: service_started
 
+      kafka:
+        condition: service_healthy
     networks:
       - task-network
 
     restart: unless-stopped
-
-
   # ========================================
   # TASK SERVICE
   # ========================================
@@ -179,16 +184,14 @@ services:
     depends_on:
       sqlserver-init:
         condition: service_completed_successfully
-
+  
       kafka:
-        condition: service_started
+        condition: service_healthy
 
     networks:
       - task-network
 
     restart: unless-stopped
-
-
   # ========================================
   # NOTIFICATION SERVICE
   # ========================================
@@ -211,16 +214,36 @@ services:
     depends_on:
       sqlserver-init:
         condition: service_completed_successfully
-
+    
       kafka:
-        condition: service_started
+        condition: service_healthy
 
     networks:
       - task-network
 
     restart: unless-stopped
+  # ========================================
+  # EMAIL SERVICE
+  # ========================================
+  email-service:
+    build: 
+      context: ./email-service
+    container_name: task-email-service
+    ports:
+      - "8084:8084"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
 
-
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - task-network
+    restart: unless-stopped
   # ========================================
   # API GATEWAY
   # ========================================
@@ -249,8 +272,6 @@ services:
       - task-network
 
     restart: unless-stopped
-
-
 # ========================================
 # VOLUMES
 # ========================================
