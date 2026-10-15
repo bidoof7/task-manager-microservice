@@ -1,0 +1,268 @@
+services:
+  # ========================================
+  # SQL SERVER
+  # ========================================
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: task-sqlserver
+
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD}
+
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+    networks:
+      - task-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "timeout 3 bash -c '</dev/tcp/localhost/1433'"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+  # ========================================
+  # SQL SERVER INIT DB
+  # ========================================
+
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    container_name: task-sqlserver-init
+
+    environment:
+      MSSQL_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD}
+
+    volumes:
+      - ./docker/sqlserver/init:/init:ro
+
+    command:
+      [
+        "/bin/bash",
+        "/init/init-db.sh"
+      ]
+
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+    networks:
+      - task-network
+
+    restart: "no"
+  # ========================================
+  # REDIS
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: task-redis
+
+    volumes:
+      - redis_data:/data
+
+    networks:
+      - task-network
+
+    restart: unless-stopped
+
+    command: redis-server --appendonly yes
+  # ========================================
+  # KAFKA
+  # ========================================
+  kafka:
+    image: apache/kafka:4.0.1
+    container_name: task-kafka
+
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:9094,CONTROLLER://:9093
+
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092
+
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+    networks:
+      - task-network
+    healthcheck:
+        test:
+          [
+            "CMD-SHELL",
+            "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"
+          ]
+        interval: 10s
+        timeout: 10s
+        retries: 10
+        start_period: 30s
+    restart: unless-stopped
+  # ========================================
+  # AUTH SERVICE
+  # ========================================
+  auth-service:
+    image: ghcr.io/bidoof7/task-manager-microservice-auth-service:${IMAGE_TAG:-latest}
+    container_name: task-auth-service
+
+    environment:
+      DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=auth_db;encrypt=false;trustServerCertificate=true
+      DB_USERNAME: sa
+      DB_PASSWORD: ${SQLSERVER_SA_PASSWORD}
+
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET}
+
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+    depends_on:
+      sqlserver-init:
+        condition: service_completed_successfully
+
+      redis:
+        condition: service_started
+
+      kafka:
+        condition: service_healthy
+    networks:
+      - task-network
+
+    restart: unless-stopped
+  # ========================================
+  # TASK SERVICE
+  # ========================================
+  task-service:
+    image: ghcr.io/bidoof7/task-manager-microservice-task-service:${IMAGE_TAG:-latest}
+
+    container_name: task-task-service
+
+    environment:
+      DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=task_db;encrypt=false;trustServerCertificate=true
+      DB_USERNAME: sa
+      DB_PASSWORD: ${SQLSERVER_SA_PASSWORD}
+
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+      JWT_SECRET: ${JWT_SECRET}
+
+    depends_on:
+      sqlserver-init:
+        condition: service_completed_successfully
+  
+      kafka:
+        condition: service_healthy
+
+    networks:
+      - task-network
+
+    restart: unless-stopped
+  # ========================================
+  # NOTIFICATION SERVICE
+  # ========================================
+  notification-service:
+    image: ghcr.io/bidoof7/task-manager-microservice-notification-service:${IMAGE_TAG:-latest}
+
+    container_name: task-notification-service
+
+    environment:
+      DB_URL: jdbc:sqlserver://sqlserver:1433;databaseName=notification_db;encrypt=false;trustServerCertificate=true
+      DB_USERNAME: sa
+      DB_PASSWORD: ${SQLSERVER_SA_PASSWORD}
+
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+    depends_on:
+      sqlserver-init:
+        condition: service_completed_successfully
+    
+      kafka:
+        condition: service_healthy
+
+    networks:
+      - task-network
+
+    restart: unless-stopped
+  # ========================================
+  # EMAIL SERVICE
+  # ========================================
+  email-service:
+    image: ghcr.io/bidoof7/task-manager-microservice-email-service:${IMAGE_TAG:-latest}
+    container_name: task-email-service
+
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - task-network
+    restart: unless-stopped
+  # ========================================
+  # API GATEWAY
+  # ========================================
+  api-gateway:
+    image: ghcr.io/bidoof7/task-manager-microservice-api-gateway:${IMAGE_TAG:-latest}
+
+    container_name: task-api-gateway
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8081
+      TASK_SERVICE_URL: http://task-service:8082
+      JWT_SECRET: ${JWT_SECRET}
+
+    depends_on:
+      auth-service:
+        condition: service_started
+
+      task-service:
+        condition: service_started
+
+    networks:
+      - task-network
+
+    restart: unless-stopped
+# ========================================
+# VOLUMES
+# ========================================
+volumes:
+
+  sqlserver_data:
+
+  redis_data:
+
+  kafka_data:
+
+
+# ========================================
+# NETWORK
+# ========================================
+networks:
+
+  task-network:
+    driver: bridge
